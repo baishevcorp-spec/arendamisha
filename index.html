@@ -2,109 +2,258 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Аренда Инструмента</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заказ инструмента</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            --tg-theme-bg-color: #fff;
-            --tg-theme-button-color: #2481cc;
-            --tg-theme-button-text-color: #fff;
-            --tg-theme-hint-color: #999;
-            --tg-theme-text-color: #000;
-            background-color: var(--tg-theme-bg-color);
-            color: var(--tg-theme-text-color);
-            font-family: sans-serif;
-        }
-        .input-field {
-            background-color: transparent;
-            border: 1px solid var(--tg-theme-hint-color);
-            color: var(--tg-theme-text-color);
-        }
+        body { background-color: #f8f9fa; padding: 15px; font-family: system-ui, -apple-system, sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .item-block { background: #fff; border: 1px solid #eee; padding: 12px; border-radius: 10px; margin-bottom: 10px; position: relative; }
+        .remove-btn { position: absolute; top: 5px; right: 8px; color: #ff4d4d; cursor: pointer; border: none; background: none; font-size: 1.2rem; }
+        .total-footer { background: #1a1a1a; color: white; padding: 20px; border-radius: 12px; position: sticky; bottom: 10px; z-index: 100; }
+        #paymentScreen { display: none; }
+        .badge-rent { background: #007bff; font-size: 0.7rem; }
+        .badge-sale { background: #28a745; font-size: 0.7rem; }
+        .loading { pointer-events: none; opacity: 0.6; }
     </style>
 </head>
-<body class="p-4">
-    <h1 class="text-xl font-bold mb-4 text-center">Новая аренда</h1>
-    
-    <form id="rentalForm" class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium mb-1">Клиент</label>
-            <input type="text" id="client" name="client" required class="w-full p-2 rounded input-field" placeholder="Имя клиента">
-        </div>
+<body>
+    <div class="container" style="max-width: 550px;">
+        <div id="orderScreen">
+            <div class="card p-3 mb-3">
+                <h4 class="text-center fw-bold mb-3">🛠 Оформление заказа</h4>
+                
+                <div class="mb-3">
+                    <input type="text" id="clientName" class="form-control mb-2" placeholder="ФИО / Компания" required>
+                    <input type="tel" id="clientPhone" class="form-control mb-2" placeholder="Телефон" required>
+                    <input type="email" id="clientEmail" class="form-control" placeholder="Ваш Email" required>
+                </div>
 
-        <div>
-            <label class="block text-sm font-medium mb-1">Телефон</label>
-            <input type="tel" id="phone" name="phone" required class="w-full p-2 rounded input-field" placeholder="89001234567">
-        </div>
+                <datalist id="toolsData"></datalist>
+                <datalist id="consData"></datalist>
 
-        <div>
-            <label class="block text-sm font-medium mb-1">Наименование инструмента</label>
-            <input type="text" id="item" name="item" required class="w-full p-2 rounded input-field" placeholder="Напр: Перфоратор">
-        </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-bold text-muted">ВЫБЕРИТЕ ИНСТРУМЕНТ</span>
+                    <div>
+                        <button class="btn btn-sm btn-primary" onclick="addItem('tool')">+ Инструмент</button>
+                        <button class="btn btn-sm btn-success" onclick="addItem('cons')">+ Расходник</button>
+                    </div>
+                </div>
 
-        <div class="flex space-x-4">
-            <div class="w-1/2">
-                <label class="block text-sm font-medium mb-1">Кол-во</label>
-                <input type="number" id="quantity" name="quantity" value="1" min="1" class="w-full p-2 rounded input-field">
+                <div id="itemsContainer"></div>
             </div>
-            <div class="w-1/2">
-                <label class="block text-sm font-medium mb-1">Срок (дней)</label>
-                <input type="number" id="days" name="days" value="1" min="1" class="w-full p-2 rounded input-field">
+
+            <div class="total-footer shadow">
+                <div class="d-flex justify-content-between small opacity-75"><span>Аренда/Товары:</span> <span id="sumItems">0</span> ₽</div>
+                <div class="d-flex justify-content-between small opacity-75"><span>Залог (возвратный):</span> <span id="sumDeposit">0</span> ₽</div>
+                <hr class="my-2 opacity-25">
+                <div class="d-flex justify-content-between h4 mb-0"><strong>ИТОГО:</strong> <strong class="text-warning"><span id="sumTotal">0</span> ₽</strong></div>
+                <button id="submitBtn" class="btn btn-primary w-100 btn-lg mt-3 fw-bold" onclick="submitOrder()">ЗАБРОНИРОВАТЬ И ОПЛАТИТЬ</button>
             </div>
         </div>
 
-        <div>
-            <label class="block text-sm font-medium mb-1">Залог (руб)</label>
-            <input type="number" id="deposit" name="deposit" value="0" class="w-full p-2 rounded input-field">
+        <div id="paymentScreen" class="card p-4 text-center">
+            <div class="display-4 text-success mb-3">✓</div>
+            <h5>Заказ сформирован</h5>
+            <p class="text-muted">К оплате с учетом залога:</p>
+            <h2 id="payAmount" class="text-primary mb-4">0 ₽</h2>
+            <a href="#" id="payButton" target="_blank" class="btn btn-success btn-lg w-100 fw-bold">ОПЛАТИТЬ ЧЕРЕЗ ТОЧКА БАНК</a>
+            <button class="btn btn-link btn-sm mt-3 text-muted" onclick="location.reload()">Вернуться к заказу</button>
         </div>
-
-        <div class="pt-4">
-            <button type="submit" id="submitBtn" class="w-full py-3 rounded-lg font-bold shadow-lg" style="background-color: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color);">
-                СОХРАНИТЬ В ТАБЛИЦУ
-            </button>
-        </div>
-    </form>
+    </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+        // ВАШ ВЕБХУК MAKE.COM
+        const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/5jtws93kbhzq1sxirfzglihmc9yytrwj";
 
-        const form = document.getElementById('rentalForm');
-        
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            
-            // Добавляем текущую дату
-            const now = new Date();
-            data.date = now.toISOString().split('T')[0];
-            
-            // Вычисляем дату возврата
-            const returnDate = new Date();
-            returnDate.setDate(now.getDate() + parseInt(data.days));
-            data.return_date = returnDate.toISOString().split('T')[0];
+        const CATALOG = {
+            tools: [
+                { name: "Лентошлифовальная машина Зубр ЗЛШМ-76-950", price: 500, deposit: 4000 },
+                { name: "Паяльник полипропилена black gear", price: 600, deposit: 3000 },
+                { name: "УШМ 125 max pro 680W", price: 350, deposit: 3000 },
+                { name: "Дрель тихоходная с микроударом AEG DB1500-2XE", price: 2500, deposit: 15000 },
+                { name: "Рубанок интерскол P-110/1100M", price: 600, deposit: 5000 },
+                { name: "Фрезер RYOBI RRT 1600", price: 800, deposit: 7000 },
+                { name: "Перфоратор Sturm RH25206PM", price: 1000, deposit: 7000 },
+                { name: "Пневмопистолет toua GSN 50", price: 1000, deposit: 20000 },
+                { name: "Фен строительный интерскол фэ-2000", price: 350, deposit: 2500 },
+                { name: "Плазморез птк RILON CUT 60 C", price: 2000, deposit: 30000 },
+                { name: "Газовый гвоздезабивной пистолет toua GFN3490CH-C", price: 1000, deposit: 25000 },
+                { name: "Бетономешалка 63 л Земляк БСЭ-63", price: 1000, deposit: 8000 },
+                { name: "Клупп sq30-2c", price: 1500, deposit: 15000 },
+                { name: "УШМ 230 metabo W2200-230", price: 800, deposit: 7000 },
+                { name: "Циклевочная машина Мисон СО-206", price: 1500, deposit: 40000 },
+                { name: "Отбойный молоток Favorit", price: 2000, deposit: 15000 },
+                { name: "Безвоздушный краскопульт SCHTAER Mars 20", price: 1500, deposit: 35000 },
+                { name: "Электропушка Stand YXC-03RE", price: 350, deposit: 3000 },
+                { name: "Дизельная пушка Ganta ТПД-55", price: 2000, deposit: 15000 },
+                { name: "Штроборез Makitta SG 150", price: 1500, deposit: 25000 },
+                { name: "Штроборез Bosch GNF 35 CA", price: 1500, deposit: 25000 },
+                { name: "Пылесос Bosch GAS 20 L SFC", price: 1000, deposit: 10000 },
+                { name: "Пылесос Makitta 440", price: 1000, deposit: 10000 },
+                { name: "Вышка тура 1,2*2,0*7,6", price: 1000, deposit: 15000 },
+                { name: "Рехао Пресс-инструмент Tim FT1240B-QC", price: 600, deposit: 10000 },
+                { name: "Каток для газона 50 л", price: 500, deposit: 5000 },
+                { name: "Жираф Schtaer 3000F3", price: 1000, deposit: 15000 },
+                { name: "Газонокосилка бенз самоходная ECO MX196", price: 2000, deposit: 20000 },
+                { name: "Тепловизор HTI HT-19", price: 1500, deposit: 25000 },
+                { name: "Перфоратор Makitta 2470", price: 600, deposit: 6000 },
+                { name: "Шуруповерт Bosch GSB120-Li", price: 600, deposit: 5000 },
+                { name: "Компрессор 100 л Inforce CE100", price: 1500, deposit: 25000 },
+                { name: "Сварочный аппарат полуавтомат сварог Real MIG 200", price: 1500, deposit: 20000 },
+                { name: "Осушитель Master DH92 (92 л/сут)", price: 1000, deposit: 40000 },
+                { name: "Осушитель Master DH62 (62 л/сут)", price: 800, deposit: 30000 },
+                { name: "Осушитель Wilms KT 800 (77 л/сут)", price: 900, deposit: 35000 },
+                { name: "Осушитель dehu-70l", price: 900, deposit: 30000 },
+                { name: "Осушитель master DH732", price: 800, deposit: 25000 },
+                { name: "Осушитель master DH752", price: 800, deposit: 25000 },
+                { name: "Осушитель Dantherm CDT 90", price: 1000, deposit: 50000 },
+                { name: "Осушитель ASPRO-DRY60", price: 800, deposit: 25000 },
+                { name: "Осушитель Dehumidifier DB50", price: 800, deposit: 20000 },
+                { name: "Осушитель Danvex DEN 500i", price: 800, deposit: 25000 },
+                { name: "Перфоратор Макита 5001с", price: 2000, deposit: 25000 },
+                { name: "Генератор CHAMPION GG7501E-3", price: 1500, deposit: 35000 },
+                { name: "Мотобур CHAMPION AG252", price: 1000, deposit: 12000 },
+                { name: "Мотопомпа FUBAG 950T", price: 800, deposit: 10000 },
+                { name: "Плиткорез Зубр", price: 1000, deposit: 10000 },
+                { name: "Сварочный аппарат Foxweld VARTEG 230", price: 500, deposit: 5000 },
+                { name: "Компрессор Aurora CYCLON-75 TURBO", price: 1000, deposit: 20000 },
+                { name: "Желобонакатный станок VOLL V-Groover 6", price: 3000, deposit: 50000 },
+                { name: "Измельчитель веток GBK 150", price: 7000, deposit: 100000 },
+                { name: "Измельчитель пней SGR1500е", price: 6000, deposit: 150000 },
+                { name: "Торцовая пила с протяжкой зубр ЗПТ-305", price: 2000, deposit: 20000 },
+                { name: "Пылесос промышленный Linolit 322E", price: 2000, deposit: 40000 },
+                { name: "Плиткорез Wandeli ZX-1200", price: 2000, deposit: 50000 },
+                { name: "Виброрейка 2,5 м VEKTOR VSJ-2.5", price: 2000, deposit: 15000 },
+                { name: "Плазморез Аврора джет 40", price: 2500, deposit: 30000 },
+                { name: "Вибратор для бетона Oli EWO 38", price: 2000, deposit: 25000 },
+                { name: "Вентилятор MASTER DF 20 P", price: 800, deposit: 10000 },
+                { name: "Газовая пушка Gigant GH30FD", price: 900, deposit: 7000 },
+                { name: "Швонарезчик Слипстоун CS146", price: 2500, deposit: 40000 },
+                { name: "Резчик кровли Слипстоун CS149", price: 2500, deposit: 40000 },
+                { name: "Виброплита 300 кг VS-309", price: 4000, deposit: 80000 },
+                { name: "Швонарезчик на 900 мм CS3213", price: 4000, deposit: 150000 },
+                { name: "Шлифмашина по бетону GM_122", price: 2500, deposit: 50000 },
+                { name: "Перфоратор SDS+ BH-2100N", price: 800, deposit: 6000 },
+                { name: "Штроборез зубр 230 мм", price: 2000, deposit: 15000 },
+                { name: "Детектор проводки Bosch gms120", price: 800, deposit: 7000 },
+                { name: "Измеритель влажности Testo", price: 800, deposit: 15000 },
+                { name: "Мойка Karcher K7 Compact", price: 1300, deposit: 25000 },
+                { name: "Виброплита 100 кг Zitrek", price: 1500, deposit: 20000 },
+                { name: "Установка алмазного бурения Сатурн", price: 2000, deposit: 40000 },
+                { name: "Вибротрамбовка Gigant Honda dvt75", price: 2000, deposit: 60000 },
+                { name: "Шлифмашина по бетону GM_245/7.5", price: 3800, deposit: 100000 },
+                { name: "Сваекрут REBIR AIE-1206", price: 2000, deposit: 20000 },
+                { name: "Снегоуборщик Huter SGC 8100", price: 2500, deposit: 40000 },
+                { name: "Термоматы (прогрев бетона)", price: 500, deposit: 3000 },
+                { name: "Затирочная машина (Вертолет)", price: 2000, deposit: 30000 },
+                { name: "Стенорез Kenrus DC 425", price: 2000, deposit: 60000 },
+                { name: "Виброплита 215 кг Masalta MS250", price: 2500, deposit: 60000 }
+            ],
+            consumables: [
+                { name: "Шнек 200мм + удлинитель", price: 500 },
+                { name: "Диск алмазный 230мм", price: 800 },
+                { name: "Перчатки рабочие", price: 100 },
+                { name: "Мешок для пылесоса", price: 350 }
+            ]
+        };
 
-            // Отправляем данные в Telegram (или напрямую на вебхук)
-            // Для стабильности в Make.com лучше отправлять через Webhook напрямую
-            
-            const WEBHOOK_URL = 'https://hook.eu1.make.com/5jtws93kbhzq1sxirfzglihmc9yytrwj';
+        function initLists() {
+            document.getElementById('toolsData').innerHTML = CATALOG.tools.map(t => `<option value="${t.name}">`).join('');
+            document.getElementById('consData').innerHTML = CATALOG.consumables.map(c => `<option value="${c.name}">`).join('');
+        }
 
-            fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(() => {
-                tg.showAlert("Данные успешно сохранены!");
-                tg.close();
-            })
-            .catch((error) => {
-                tg.showAlert("Ошибка при сохранении: " + error);
+        function addItem(type) {
+            const container = document.getElementById('itemsContainer');
+            const div = document.createElement('div');
+            div.className = `item-block ${type}-item`;
+            div.innerHTML = `
+                <button class="remove-btn" onclick="this.parentElement.remove(); calc()">&times;</button>
+                <span class="badge ${type==='tool'?'badge-rent':'badge-sale'} mb-2">${type==='tool'?'АРЕНДА':'ТОВАР'}</span>
+                <input type="text" class="form-control mb-2 name-input" list="${type==='tool'?'toolsData':'consData'}" placeholder="Начните вводить..." oninput="calc()">
+                <div class="row g-2">
+                    <div class="col-6"><label class="small text-muted">Кол-во</label><input type="number" class="form-control qty" value="1" min="1" oninput="calc()"></div>
+                    ${type==='tool' ? '<div class="col-6"><label class="small text-muted">Дней</label><input type="number" class="form-control days" value="1" min="1" oninput="calc()"></div>' : ''}
+                </div>`;
+            container.prepend(div);
+        }
+
+        function calc() {
+            let itemsSum = 0; let depositSum = 0;
+            document.querySelectorAll('.item-block').forEach(el => {
+                const name = el.querySelector('.name-input').value;
+                const qty = parseInt(el.querySelector('.qty').value) || 0;
+                if (el.classList.contains('tool-item')) {
+                    const tool = CATALOG.tools.find(t => t.name === name);
+                    const days = parseInt(el.querySelector('.days').value) || 0;
+                    if (tool) { itemsSum += tool.price * qty * days; depositSum += tool.deposit * qty; }
+                } else {
+                    const cons = CATALOG.consumables.find(c => c.name === name);
+                    if (cons) itemsSum += cons.price * qty;
+                }
             });
-        });
+            document.getElementById('sumItems').innerText = itemsSum.toLocaleString();
+            document.getElementById('sumDeposit').innerText = depositSum.toLocaleString();
+            document.getElementById('sumTotal').innerText = (itemsSum + depositSum).toLocaleString();
+        }
+
+        async function submitOrder() {
+            const name = document.getElementById('clientName').value;
+            const phone = document.getElementById('clientPhone').value;
+            const email = document.getElementById('clientEmail').value;
+            const btn = document.getElementById('submitBtn');
+            
+            if(!name || !email || !phone) return alert('Заполните ФИО, Телефон и Email');
+            
+            let orderDetails = [];
+            document.querySelectorAll('.item-block').forEach(el => {
+                const itemName = el.querySelector('.name-input').value;
+                if(itemName) orderDetails.push(itemName);
+            });
+
+            const totalSum = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
+            
+            btn.innerText = "ОФОРМЛЯЕМ СЧЕТ...";
+            btn.classList.add('loading');
+
+            try {
+                const response = await fetch(MAKE_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_name: name,
+                        customer_phone: phone,
+                        customer_email: email,
+                        total_amount: totalSum,
+                        items_list: orderDetails.join(', ')
+                    })
+                });
+
+                if (!response.ok) throw new Error('Ошибка сети');
+
+                const result = await response.json();
+
+                if (result.checkout_url) {
+                    document.getElementById('payButton').href = result.checkout_url;
+                    document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
+                    
+                    document.getElementById('orderScreen').style.display = 'none';
+                    document.getElementById('paymentScreen').style.display = 'block';
+                } else {
+                    alert('Ошибка: Make.com не вернул ссылку. Проверьте сценарий (модуль Webhook Response).');
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Произошла ошибка при связи с Make.com. Проверьте консоль.');
+            } finally {
+                btn.innerText = "ЗАБРОНИРОВАТЬ И ОПЛАТИТЬ";
+                btn.classList.remove('loading');
+            }
+        }
+
+        initLists();
+        addItem('tool');
     </script>
 </body>
 </html>
