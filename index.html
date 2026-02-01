@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Аренда Инструмента</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            --tg-theme-bg-color: #fff;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #fff;
+            --tg-theme-hint-color: #999;
+            --tg-theme-text-color: #000;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            font-family: sans-serif;
+        }
+        .input-field {
+            background-color: transparent;
+            border: 1px solid var(--tg-theme-hint-color);
+            color: var(--tg-theme-text-color);
+        }
+    </style>
+</head>
+<body class="p-4">
+    <h1 class="text-xl font-bold mb-4 text-center">Новая аренда</h1>
+    
+    <form id="rentalForm" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium mb-1">Клиент</label>
+            <input type="text" id="client" name="client" required class="w-full p-2 rounded input-field" placeholder="Имя клиента">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Телефон</label>
+            <input type="tel" id="phone" name="phone" required class="w-full p-2 rounded input-field" placeholder="89001234567">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Наименование инструмента</label>
+            <input type="text" id="item" name="item" required class="w-full p-2 rounded input-field" placeholder="Напр: Перфоратор">
+        </div>
+
+        <div class="flex space-x-4">
+            <div class="w-1/2">
+                <label class="block text-sm font-medium mb-1">Кол-во</label>
+                <input type="number" id="quantity" name="quantity" value="1" min="1" class="w-full p-2 rounded input-field">
+            </div>
+            <div class="w-1/2">
+                <label class="block text-sm font-medium mb-1">Срок (дней)</label>
+                <input type="number" id="days" name="days" value="1" min="1" class="w-full p-2 rounded input-field">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Залог (руб)</label>
+            <input type="number" id="deposit" name="deposit" value="0" class="w-full p-2 rounded input-field">
+        </div>
+
+        <div class="pt-4">
+            <button type="submit" id="submitBtn" class="w-full py-3 rounded-lg font-bold shadow-lg" style="background-color: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color);">
+                СОХРАНИТЬ В ТАБЛИЦУ
+            </button>
+        </div>
+    </form>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const form = document.getElementById('rentalForm');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Добавляем текущую дату
+            const now = new Date();
+            data.date = now.toISOString().split('T')[0];
+            
+            // Вычисляем дату возврата
+            const returnDate = new Date();
+            returnDate.setDate(now.getDate() + parseInt(data.days));
+            data.return_date = returnDate.toISOString().split('T')[0];
+
+            // Отправляем данные в Telegram (или напрямую на вебхук)
+            // Для стабильности в Make.com лучше отправлять через Webhook напрямую
+            
+            const WEBHOOK_URL = 'https://hook.eu1.make.com/5jtws93kbhzq1sxirfzglihmc9yytrwj';
+
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(() => {
+                tg.showAlert("Данные успешно сохранены!");
+                tg.close();
+            })
+            .catch((error) => {
+                tg.showAlert("Ошибка при сохранении: " + error);
+            });
+        });
+    </script>
+</body>
+</html>
