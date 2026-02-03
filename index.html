@@ -245,7 +245,7 @@
             document.getElementById('sumTotal').innerText = (itemsSum + depositSum).toLocaleString();
         }
 
-        async function submitOrder() {
+                async function submitOrder() {
             const name = document.getElementById('clientName').value.trim();
             const phone = document.getElementById('clientPhone').value.trim();
             const email = document.getElementById('clientEmail').value.trim();
@@ -277,8 +277,9 @@
             if (itemsList === "") itemsList = "Нет выбранных товаров";
 
             const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
-            // Получаем сумму залога для отправки
-            const depositRaw = document.getElementById('sumDeposit').innerText.replace(/\s/g, '');
+            
+            // --- ВАЖНО: ПОЛУЧАЕМ СУММУ ЗАЛОГА ---
+            const depositRaw = document.getElementById('sumDeposit').innerText.replace(/\s/g, ''); 
 
             // Отправка в Make
             if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
@@ -293,7 +294,7 @@
                             items: itemsList,
                             total: totalRaw,
                             days: globalDays,
-                            deposit: depositRaw // <--- ОТПРАВЛЯЕМ ЗАЛОГ ОТДЕЛЬНО
+                            deposit: depositRaw // <--- ВОТ ЭТА СТРОКА ОТПРАВЛЯЕТ ЗАЛОГ
                         })
                     });
                 } catch (e) {
@@ -306,7 +307,7 @@
             document.getElementById('payButton').href = paymentUrl;
             document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
             
-            // Отображаем залог на финальном экране
+            // Показываем залог на финальном экране
             document.getElementById('payDeposit').innerText = document.getElementById('sumDeposit').innerText;
 
             document.getElementById('loadingSpinner').style.display = 'none';
