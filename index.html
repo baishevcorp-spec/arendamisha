@@ -32,7 +32,7 @@
                 
                 <div class="mb-3">
                     <input type="text" id="clientName" class="form-control mb-2" placeholder="ФИО / Компания" required>
-                    <input type="tel" id="clientPhone" class="form-control mb-2" placeholder="Телефон +79123456789" required>
+                    <input type="tel" id="clientPhone" class="form-control mb-2" placeholder="Телефон +79...." required>
                     <input type="email" id="clientEmail" class="form-control" placeholder="Ваш Email" required>
                 </div>
 
@@ -209,67 +209,70 @@
             document.getElementById('sumTotal').innerText = (itemsSum + depositSum).toLocaleString();
         }
 
-        async function submitOrder() {
-            const name = document.getElementById('clientName').value.trim();
-            const phone = document.getElementById('clientPhone').value.trim();
-            const email = document.getElementById('clientEmail').value.trim();
-            
-            if (!name || !phone || !email) return alert('Заполните ФИО, Телефон и Email');
-            
-            // Валидация
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) return alert('Введите корректный Email');
-            const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
-            if (!phoneRegex.test(phone)) return alert('Введите корректный номер телефона');
+                  async function submitOrder() {
+              const name = document.getElementById('clientName').value.trim();
+              const phone = document.getElementById('clientPhone').value.trim();
+              const email = document.getElementById('clientEmail').value.trim();
+              
+              if (!name || !phone || !email) return alert('Заполните ФИО, Телефон и Email');
+              
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRegex.test(email)) return alert('Введите корректный Email');
+              const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
+              if (!phoneRegex.test(phone)) return alert('Введите корректный номер телефона');
 
-            // Показываем спиннер
-            document.getElementById('loadingSpinner').style.display = 'flex';
+              document.getElementById('loadingSpinner').style.display = 'flex';
 
-            // Сбор данных для менеджера
-            let itemsList = "";
-            document.querySelectorAll('.item-block').forEach(el => {
-                const itemName = el.querySelector('.name-input').value;
-                const qty = el.querySelector('.qty').value;
-                let details = `${itemName} (x${qty})`;
-                if (el.classList.contains('tool-item')) {
-                    const days = el.querySelector('.days').value;
-                    details += ` на ${days} дн.`;
-                }
-                itemsList += `• ${details}\n`;
-            });
-            if (itemsList === "") itemsList = "Нет выбранных товаров";
+              // Сбор данных
+              let itemsList = "";
+              let maxDays = 0; // Переменная для срока
 
-            const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
+              document.querySelectorAll('.item-block').forEach(el => {
+                  const itemName = el.querySelector('.name-input').value;
+                  const qty = el.querySelector('.qty').value;
+                  let details = `${itemName} (x${qty})`;
+                  
+                  if (el.classList.contains('tool-item')) {
+                      const days = parseInt(el.querySelector('.days').value) || 0;
+                      details += ` на ${days} дн.`;
+                      // Ищем максимальный срок среди всех инструментов
+                      if (days > maxDays) maxDays = days;
+                  }
+                  itemsList += `• ${details}\n`;
+              });
+              if (itemsList === "") itemsList = "Нет выбранных товаров";
 
-            // 1. Отправка в Make (Telegram)
-            if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
-                try {
-                    await fetch(MAKE_WEBHOOK_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            name: name,
-                            phone: phone,
-                            email: email,
-                            items: itemsList,
-                            total: totalRaw
-                        })
-                    });
-                } catch (e) {
-                    console.log("Ошибка отправки в Make, продолжаем...", e);
-                }
-            }
+              const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
 
-            // 2. Формирование ссылки на оплату
-            const paymentUrl = `${TOCHKA_BASE_URL}?sum=${totalRaw}&fio=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`;
-            
-            document.getElementById('payButton').href = paymentUrl;
-            document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
-            
-            document.getElementById('loadingSpinner').style.display = 'none';
-            document.getElementById('orderScreen').style.display = 'none';
-            document.getElementById('paymentScreen').style.display = 'block';
-        }
+              // Отправка в Make
+              if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
+                  try {
+                      await fetch(MAKE_WEBHOOK_URL, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              name: name,
+                              phone: phone,
+                              email: email,
+                              items: itemsList,
+                              total: totalRaw,
+                              days: maxDays // <--- ОТПРАВЛЯЕМ СРОК
+                          })
+                      });
+                  } catch (e) {
+                      console.log("Ошибка отправки в Make", e);
+                  }
+              }
+
+              const paymentUrl = `${TOCHKA_BASE_URL}?sum=${totalRaw}&fio=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`;
+              
+              document.getElementById('payButton').href = paymentUrl;
+              document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
+              
+              document.getElementById('loadingSpinner').style.display = 'none';
+              document.getElementById('orderScreen').style.display = 'none';
+              document.getElementById('paymentScreen').style.display = 'block';
+          }
 
         initLists();
         addItem('tool');
