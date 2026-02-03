@@ -14,14 +14,21 @@
         #paymentScreen { display: none; }
         .badge-rent { background: #007bff; font-size: 0.7rem; }
         .badge-sale { background: #28a745; font-size: 0.7rem; }
-        .loading { pointer-events: none; opacity: 0.6; }
+        /* Спиннер загрузки */
+        .spinner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 200; justify-content: center; align-items: center; flex-direction: column; }
     </style>
 </head>
 <body>
+    <!-- Экран загрузки -->
+    <div id="loadingSpinner" class="spinner-overlay">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+        <div class="mt-3 fw-bold">Оформляем заказ...</div>
+    </div>
+
     <div class="container" style="max-width: 550px;">
         <div id="orderScreen">
             <div class="card p-3 mb-3">
-                <h4 class="text-center fw-bold mb-3">🛠 Оформление заказа</h4>
+                <h4 class="text-center fw-bold mb-3">🔧 Оформление аренды</h4>
                 
                 <div class="mb-3">
                     <input type="text" id="clientName" class="form-control mb-2" placeholder="ФИО / Компания" required>
@@ -48,7 +55,7 @@
                 <div class="d-flex justify-content-between small opacity-75"><span>Залог (возвратный):</span> <span id="sumDeposit">0</span> ₽</div>
                 <hr class="my-2 opacity-25">
                 <div class="d-flex justify-content-between h4 mb-0"><strong>ИТОГО:</strong> <strong class="text-warning"><span id="sumTotal">0</span> ₽</strong></div>
-                <button id="submitBtn" class="btn btn-primary w-100 btn-lg mt-3 fw-bold" onclick="submitOrder()">ЗАБРОНИРОВАТЬ И ОПЛАТИТЬ</button>
+                <button class="btn btn-primary w-100 btn-lg mt-3 fw-bold" onclick="submitOrder()">ЗАБРОНИРОВАТЬ И ОПЛАТИТЬ</button>
             </div>
         </div>
 
@@ -57,14 +64,19 @@
             <h5>Заказ сформирован</h5>
             <p class="text-muted">К оплате с учетом залога:</p>
             <h2 id="payAmount" class="text-primary mb-4">0 ₽</h2>
+            <p class="small text-muted">Если данные не подтянулись, введите их вручную в форме оплаты.</p>
             <a href="#" id="payButton" target="_blank" class="btn btn-success btn-lg w-100 fw-bold">ОПЛАТИТЬ ЧЕРЕЗ ТОЧКА БАНК</a>
             <button class="btn btn-link btn-sm mt-3 text-muted" onclick="location.reload()">Вернуться к заказу</button>
         </div>
     </div>
 
     <script>
-        // ВАШ ВЕБХУК MAKE.COM
-        const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/5jtws93kbhzq1sxirfzglihmc9yytrwj";
+        // ================= НАСТРОЙКИ =================
+        const TOCHKA_BASE_URL = "https://checkout.tochka.com/7d0c1c1b-56ed-4df2-aa19-df7ce0568ae0";
+        
+        // 🔴 ВСТАВЬТЕ СЮДА ВАШ WEBHOOK ИЗ MAKE.COM
+        const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/a82jcgdj7u88frnb6bm0xqukvlxxw4og"; 
+        // =============================================
 
         const CATALOG = {
             tools: [
@@ -198,58 +210,65 @@
         }
 
         async function submitOrder() {
-            const name = document.getElementById('clientName').value;
-            const phone = document.getElementById('clientPhone').value;
-            const email = document.getElementById('clientEmail').value;
-            const btn = document.getElementById('submitBtn');
+            const name = document.getElementById('clientName').value.trim();
+            const phone = document.getElementById('clientPhone').value.trim();
+            const email = document.getElementById('clientEmail').value.trim();
             
-            if(!name || !email || !phone) return alert('Заполните ФИО, Телефон и Email');
+            if (!name || !phone || !email) return alert('Заполните ФИО, Телефон и Email');
             
-            let orderDetails = [];
+            // Валидация
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) return alert('Введите корректный Email');
+            const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
+            if (!phoneRegex.test(phone)) return alert('Введите корректный номер телефона');
+
+            // Показываем спиннер
+            document.getElementById('loadingSpinner').style.display = 'flex';
+
+            // Сбор данных для менеджера
+            let itemsList = "";
             document.querySelectorAll('.item-block').forEach(el => {
                 const itemName = el.querySelector('.name-input').value;
-                if(itemName) orderDetails.push(itemName);
-            });
-
-            const totalSum = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
-            
-            btn.innerText = "ОФОРМЛЯЕМ СЧЕТ...";
-            btn.classList.add('loading');
-
-            try {
-                const response = await fetch(MAKE_WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        customer_name: name,
-                        customer_phone: phone,
-                        customer_email: email,
-                        total_amount: totalSum,
-                        items_list: orderDetails.join(', ')
-                    })
-                });
-
-                if (!response.ok) throw new Error('Ошибка сети');
-
-                const result = await response.json();
-
-                if (result.checkout_url) {
-                    document.getElementById('payButton').href = result.checkout_url;
-                    document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
-                    
-                    document.getElementById('orderScreen').style.display = 'none';
-                    document.getElementById('paymentScreen').style.display = 'block';
-                } else {
-                    alert('Ошибка: Make.com не вернул ссылку. Проверьте сценарий (модуль Webhook Response).');
+                const qty = el.querySelector('.qty').value;
+                let details = `${itemName} (x${qty})`;
+                if (el.classList.contains('tool-item')) {
+                    const days = el.querySelector('.days').value;
+                    details += ` на ${days} дн.`;
                 }
+                itemsList += `• ${details}\n`;
+            });
+            if (itemsList === "") itemsList = "Нет выбранных товаров";
 
-            } catch (error) {
-                console.error(error);
-                alert('Произошла ошибка при связи с Make.com. Проверьте консоль.');
-            } finally {
-                btn.innerText = "ЗАБРОНИРОВАТЬ И ОПЛАТИТЬ";
-                btn.classList.remove('loading');
+            const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
+
+            // 1. Отправка в Make (Telegram)
+            if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
+                try {
+                    await fetch(MAKE_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: name,
+                            phone: phone,
+                            email: email,
+                            items: itemsList,
+                            total: totalRaw
+                        })
+                    });
+                } catch (e) {
+                    console.log("Ошибка отправки в Make, продолжаем...", e);
+                }
             }
+
+            // 2. Формирование ссылки на оплату
+            const paymentUrl = `${TOCHKA_BASE_URL}?sum=${totalRaw}&fio=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`;
+            
+            document.getElementById('payButton').href = paymentUrl;
+            document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
+            
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('orderScreen').style.display = 'none';
+            document.getElementById('paymentScreen').style.display = 'block';
         }
 
         initLists();
