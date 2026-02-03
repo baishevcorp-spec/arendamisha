@@ -48,6 +48,19 @@
                 </div>
 
                 <div id="itemsContainer"></div>
+
+                <!-- НОВЫЙ БЛОК: ОБЩИЙ СРОК АРЕНДЫ -->
+                <div class="mt-4 p-3 bg-light rounded border">
+                    <label class="fw-bold d-block mb-2">📅 На сколько дней берете?</label>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-white border shadow-sm fw-bold" onclick="changeGlobalDays(-1)" style="width: 45px; height: 45px;">-</button>
+                        <input type="number" id="globalDays" class="form-control mx-2 text-center fw-bold fs-5" value="1" min="1" readonly style="width: 80px; background: white;">
+                        <button class="btn btn-white border shadow-sm fw-bold" onclick="changeGlobalDays(1)" style="width: 45px; height: 45px;">+</button>
+                        <span class="ms-2 fs-6 text-muted">суток</span>
+                    </div>
+                </div>
+                <!-- КОНЕЦ НОВОГО БЛОКА -->
+
             </div>
 
             <div class="total-footer shadow">
@@ -175,30 +188,47 @@
             document.getElementById('consData').innerHTML = CATALOG.consumables.map(c => `<option value="${c.name}">`).join('');
         }
 
+        // Функция изменения общего срока
+        function changeGlobalDays(delta) {
+            const input = document.getElementById('globalDays');
+            let val = parseInt(input.value) || 1;
+            val += delta;
+            if (val < 1) val = 1;
+            input.value = val;
+            calc(); // Пересчитываем сумму сразу
+        }
+
         function addItem(type) {
             const container = document.getElementById('itemsContainer');
             const div = document.createElement('div');
             div.className = `item-block ${type}-item`;
+            // Убрал поле "Дней" из HTML ниже
             div.innerHTML = `
                 <button class="remove-btn" onclick="this.parentElement.remove(); calc()">&times;</button>
                 <span class="badge ${type==='tool'?'badge-rent':'badge-sale'} mb-2">${type==='tool'?'АРЕНДА':'ТОВАР'}</span>
                 <input type="text" class="form-control mb-2 name-input" list="${type==='tool'?'toolsData':'consData'}" placeholder="Начните вводить..." oninput="calc()">
                 <div class="row g-2">
-                    <div class="col-6"><label class="small text-muted">Кол-во</label><input type="number" class="form-control qty" value="1" min="1" oninput="calc()"></div>
-                    ${type==='tool' ? '<div class="col-6"><label class="small text-muted">Дней</label><input type="number" class="form-control days" value="1" min="1" oninput="calc()"></div>' : ''}
+                    <div class="col-12"><label class="small text-muted">Количество</label><input type="number" class="form-control qty" value="1" min="1" oninput="calc()"></div>
                 </div>`;
             container.prepend(div);
         }
 
         function calc() {
             let itemsSum = 0; let depositSum = 0;
+            // Берем общий срок
+            const globalDays = parseInt(document.getElementById('globalDays').value) || 1;
+
             document.querySelectorAll('.item-block').forEach(el => {
                 const name = el.querySelector('.name-input').value;
                 const qty = parseInt(el.querySelector('.qty').value) || 0;
+                
                 if (el.classList.contains('tool-item')) {
                     const tool = CATALOG.tools.find(t => t.name === name);
-                    const days = parseInt(el.querySelector('.days').value) || 0;
-                    if (tool) { itemsSum += tool.price * qty * days; depositSum += tool.deposit * qty; }
+                    if (tool) { 
+                        // Умножаем на общий срок
+                        itemsSum += tool.price * qty * globalDays; 
+                        depositSum += tool.deposit * qty; 
+                    }
                 } else {
                     const cons = CATALOG.consumables.find(c => c.name === name);
                     if (cons) itemsSum += cons.price * qty;
@@ -209,70 +239,70 @@
             document.getElementById('sumTotal').innerText = (itemsSum + depositSum).toLocaleString();
         }
 
-                  async function submitOrder() {
-              const name = document.getElementById('clientName').value.trim();
-              const phone = document.getElementById('clientPhone').value.trim();
-              const email = document.getElementById('clientEmail').value.trim();
-              
-              if (!name || !phone || !email) return alert('Заполните ФИО, Телефон и Email');
-              
-              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-              if (!emailRegex.test(email)) return alert('Введите корректный Email');
-              const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
-              if (!phoneRegex.test(phone)) return alert('Введите корректный номер телефона');
+        async function submitOrder() {
+            const name = document.getElementById('clientName').value.trim();
+            const phone = document.getElementById('clientPhone').value.trim();
+            const email = document.getElementById('clientEmail').value.trim();
+            
+            if (!name || !phone || !email) return alert('Заполните ФИО, Телефон и Email');
+            
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) return alert('Введите корректный Email');
+            const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
+            if (!phoneRegex.test(phone)) return alert('Введите корректный номер телефона');
 
-              document.getElementById('loadingSpinner').style.display = 'flex';
+            document.getElementById('loadingSpinner').style.display = 'flex';
 
-              // Сбор данных
-              let itemsList = "";
-              let maxDays = 0; // Переменная для срока
+            // Берем общий срок
+            const globalDays = parseInt(document.getElementById('globalDays').value) || 1;
+            
+            let itemsList = "";
 
-              document.querySelectorAll('.item-block').forEach(el => {
-                  const itemName = el.querySelector('.name-input').value;
-                  const qty = el.querySelector('.qty').value;
-                  let details = `${itemName} (x${qty})`;
-                  
-                  if (el.classList.contains('tool-item')) {
-                      const days = parseInt(el.querySelector('.days').value) || 0;
-                      details += ` на ${days} дн.`;
-                      // Ищем максимальный срок среди всех инструментов
-                      if (days > maxDays) maxDays = days;
-                  }
-                  itemsList += `• ${details}\n`;
-              });
-              if (itemsList === "") itemsList = "Нет выбранных товаров";
+            document.querySelectorAll('.item-block').forEach(el => {
+                const itemName = el.querySelector('.name-input').value;
+                const qty = el.querySelector('.qty').value;
+                let details = `${itemName} (x${qty})`;
+                
+                if (el.classList.contains('tool-item')) {
+                    // Добавляем инфо о днях в строку товара для наглядности
+                    details += ` на ${globalDays} дн.`;
+                }
+                itemsList += `• ${details}\n`;
+            });
 
-              const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
+            if (itemsList === "") itemsList = "Нет выбранных товаров";
 
-              // Отправка в Make
-              if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
-                  try {
-                      await fetch(MAKE_WEBHOOK_URL, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                              name: name,
-                              phone: phone,
-                              email: email,
-                              items: itemsList,
-                              total: totalRaw,
-                              days: maxDays // <--- ОТПРАВЛЯЕМ СРОК
-                          })
-                      });
-                  } catch (e) {
-                      console.log("Ошибка отправки в Make", e);
-                  }
-              }
+            const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
 
-              const paymentUrl = `${TOCHKA_BASE_URL}?sum=${totalRaw}&fio=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`;
-              
-              document.getElementById('payButton').href = paymentUrl;
-              document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
-              
-              document.getElementById('loadingSpinner').style.display = 'none';
-              document.getElementById('orderScreen').style.display = 'none';
-              document.getElementById('paymentScreen').style.display = 'block';
-          }
+            // Отправка в Make
+            if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
+                try {
+                    await fetch(MAKE_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: name,
+                            phone: phone,
+                            email: email,
+                            items: itemsList,
+                            total: totalRaw,
+                            days: globalDays // <-- ОТПРАВЛЯЕМ ОБЩИЙ СРОК
+                        })
+                    });
+                } catch (e) {
+                    console.log("Ошибка отправки в Make", e);
+                }
+            }
+
+            const paymentUrl = `${TOCHKA_BASE_URL}?sum=${totalRaw}&fio=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`;
+            
+            document.getElementById('payButton').href = paymentUrl;
+            document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
+            
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('orderScreen').style.display = 'none';
+            document.getElementById('paymentScreen').style.display = 'block';
+        }
 
         initLists();
         addItem('tool');
