@@ -49,7 +49,7 @@
 
                 <div id="itemsContainer"></div>
 
-                <!-- НОВЫЙ БЛОК: ОБЩИЙ СРОК АРЕНДЫ -->
+                <!-- БЛОК: ОБЩИЙ СРОК АРЕНДЫ -->
                 <div class="mt-4 p-3 bg-light rounded border">
                     <label class="fw-bold d-block mb-2">📅 На сколько дней берете?</label>
                     <div class="d-flex align-items-center">
@@ -59,7 +59,6 @@
                         <span class="ms-2 fs-6 text-muted">суток</span>
                     </div>
                 </div>
-                <!-- КОНЕЦ НОВОГО БЛОКА -->
 
             </div>
 
@@ -75,8 +74,16 @@
         <div id="paymentScreen" class="card p-4 text-center">
             <div class="display-4 text-success mb-3">✓</div>
             <h5>Заказ сформирован</h5>
-            <p class="text-muted">К оплате с учетом залога:</p>
-            <h2 id="payAmount" class="text-primary mb-4">0 ₽</h2>
+            <p class="text-muted mb-1">К оплате с учетом залога:</p>
+            <h2 id="payAmount" class="text-primary mb-2">0 ₽</h2>
+            
+            <!-- НОВОЕ: Отображение залога отдельно -->
+            <div class="bg-light p-2 rounded mb-4 border">
+                <small class="text-muted d-block">В том числе возвратный залог:</small>
+                <strong class="fs-5 text-dark"><span id="payDeposit">0</span> ₽</strong>
+            </div>
+            <!-- КОНЕЦ НОВОГО -->
+
             <p class="small text-muted">Если данные не подтянулись, введите их вручную в форме оплаты.</p>
             <a href="#" id="payButton" target="_blank" class="btn btn-success btn-lg w-100 fw-bold">ОПЛАТИТЬ ЧЕРЕЗ ТОЧКА БАНК</a>
             <button class="btn btn-link btn-sm mt-3 text-muted" onclick="location.reload()">Вернуться к заказу</button>
@@ -196,15 +203,11 @@
             calc(); // Пересчитываем сумму сразу
         }
 
-        // ВНИМАНИЕ: Здесь исправлен HTML карточки, убрано поле Дней
         function addItem(type) {
             const container = document.getElementById('itemsContainer');
             const div = document.createElement('div');
             div.className = `item-block ${type}-item`;
             
-            // Генерируем HTML карточки.
-            // Для инструментов (tool) и расходников (cons) теперь одинаковое поле количества.
-            // Индивидуального поля "Дней" больше нет.
             div.innerHTML = `
                 <button class="remove-btn" onclick="this.parentElement.remove(); calc()">&times;</button>
                 <span class="badge ${type==='tool'?'badge-rent':'badge-sale'} mb-2">${type==='tool'?'АРЕНДА':'ТОВАР'}</span>
@@ -220,7 +223,6 @@
 
         function calc() {
             let itemsSum = 0; let depositSum = 0;
-            // Берем общий срок из нижнего поля
             const globalDays = parseInt(document.getElementById('globalDays').value) || 1;
 
             document.querySelectorAll('.item-block').forEach(el => {
@@ -230,7 +232,6 @@
                 if (el.classList.contains('tool-item')) {
                     const tool = CATALOG.tools.find(t => t.name === name);
                     if (tool) { 
-                        // Умножаем цену на общий срок
                         itemsSum += tool.price * qty * globalDays; 
                         depositSum += tool.deposit * qty; 
                     }
@@ -258,7 +259,6 @@
 
             document.getElementById('loadingSpinner').style.display = 'flex';
 
-            // Берем общий срок
             const globalDays = parseInt(document.getElementById('globalDays').value) || 1;
             
             let itemsList = "";
@@ -269,7 +269,6 @@
                 let details = `${itemName} (x${qty})`;
                 
                 if (el.classList.contains('tool-item')) {
-                    // Добавляем инфо о днях в строку товара для наглядности
                     details += ` на ${globalDays} дн.`;
                 }
                 itemsList += `• ${details}\n`;
@@ -278,6 +277,8 @@
             if (itemsList === "") itemsList = "Нет выбранных товаров";
 
             const totalRaw = document.getElementById('sumTotal').innerText.replace(/\s/g, '');
+            // Получаем сумму залога для отправки
+            const depositRaw = document.getElementById('sumDeposit').innerText.replace(/\s/g, '');
 
             // Отправка в Make
             if (MAKE_WEBHOOK_URL && MAKE_WEBHOOK_URL.includes('hook')) {
@@ -291,7 +292,8 @@
                             email: email,
                             items: itemsList,
                             total: totalRaw,
-                            days: globalDays // <-- ОТПРАВЛЯЕМ ОБЩИЙ СРОК
+                            days: globalDays,
+                            deposit: depositRaw // <--- ОТПРАВЛЯЕМ ЗАЛОГ ОТДЕЛЬНО
                         })
                     });
                 } catch (e) {
@@ -304,6 +306,9 @@
             document.getElementById('payButton').href = paymentUrl;
             document.getElementById('payAmount').innerText = document.getElementById('sumTotal').innerText + ' ₽';
             
+            // Отображаем залог на финальном экране
+            document.getElementById('payDeposit').innerText = document.getElementById('sumDeposit').innerText;
+
             document.getElementById('loadingSpinner').style.display = 'none';
             document.getElementById('orderScreen').style.display = 'none';
             document.getElementById('paymentScreen').style.display = 'block';
