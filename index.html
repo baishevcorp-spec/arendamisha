@@ -86,8 +86,6 @@
     <script>
         // ================= НАСТРОЙКИ =================
         const TOCHKA_BASE_URL = "https://checkout.tochka.com/7d0c1c1b-56ed-4df2-aa19-df7ce0568ae0";
-        
-        // 🔴 ВСТАВЬТЕ СЮДА ВАШ WEBHOOK ИЗ MAKE.COM
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/a82jcgdj7u88frnb6bm0xqukvlxxw4og"; 
         // =============================================
 
@@ -198,24 +196,31 @@
             calc(); // Пересчитываем сумму сразу
         }
 
+        // ВНИМАНИЕ: Здесь исправлен HTML карточки, убрано поле Дней
         function addItem(type) {
             const container = document.getElementById('itemsContainer');
             const div = document.createElement('div');
             div.className = `item-block ${type}-item`;
-            // Убрал поле "Дней" из HTML ниже
+            
+            // Генерируем HTML карточки.
+            // Для инструментов (tool) и расходников (cons) теперь одинаковое поле количества.
+            // Индивидуального поля "Дней" больше нет.
             div.innerHTML = `
                 <button class="remove-btn" onclick="this.parentElement.remove(); calc()">&times;</button>
                 <span class="badge ${type==='tool'?'badge-rent':'badge-sale'} mb-2">${type==='tool'?'АРЕНДА':'ТОВАР'}</span>
                 <input type="text" class="form-control mb-2 name-input" list="${type==='tool'?'toolsData':'consData'}" placeholder="Начните вводить..." oninput="calc()">
                 <div class="row g-2">
-                    <div class="col-12"><label class="small text-muted">Количество</label><input type="number" class="form-control qty" value="1" min="1" oninput="calc()"></div>
+                    <div class="col-12">
+                        <label class="small text-muted">Количество</label>
+                        <input type="number" class="form-control qty" value="1" min="1" oninput="calc()">
+                    </div>
                 </div>`;
             container.prepend(div);
         }
 
         function calc() {
             let itemsSum = 0; let depositSum = 0;
-            // Берем общий срок
+            // Берем общий срок из нижнего поля
             const globalDays = parseInt(document.getElementById('globalDays').value) || 1;
 
             document.querySelectorAll('.item-block').forEach(el => {
@@ -225,7 +230,7 @@
                 if (el.classList.contains('tool-item')) {
                     const tool = CATALOG.tools.find(t => t.name === name);
                     if (tool) { 
-                        // Умножаем на общий срок
+                        // Умножаем цену на общий срок
                         itemsSum += tool.price * qty * globalDays; 
                         depositSum += tool.deposit * qty; 
                     }
